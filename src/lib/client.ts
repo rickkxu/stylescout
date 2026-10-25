@@ -20,7 +20,7 @@ export async function api<T = unknown>(path: string, init?: RequestInit & { json
 
 // Shrink photos on the device before upload so they stay small and fast.
 export async function resizeImage(file: File, maxSide = 1400): Promise<Blob> {
-  const bitmap = await createImageBitmap(file);
+  const bitmap = await decodeImage(file);
   const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(bitmap.width * scale);
@@ -29,6 +29,23 @@ export async function resizeImage(file: File, maxSide = 1400): Promise<Blob> {
   return new Promise((resolve, reject) =>
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Couldn't read that photo"))), "image/jpeg", 0.85),
   );
+}
+
+// Most browsers can't decode iPhone HEIC photos, so fall back to a WebAssembly decoder,
+// loaded only when needed.
+async function decodeImage(file: File): Promise<ImageBitmap> {
+  try {
+    return await createImageBitmap(file);
+  } catch (err) {
+    const { isHeic, heicTo } = await import("heic-to/next");
+    const heic = /\.hei[cf]$/i.test(file.name) || /image\/hei[cf]/i.test(file.type) || (await isHeic(file).catch(() => false));
+    if (!heic) throw err;
+    try {
+      return await heicTo({ blob: file, type: "bitmap" });
+    } catch {
+      throw new Error("Couldn't read that HEIC photo. Try exporting it as a JPEG.");
+    }
+  }
 }
 
 export function formatPrice(price: number | null, currency: string | null) {

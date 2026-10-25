@@ -37,7 +37,7 @@ export function ClosetUploader({ onAdded, label = "Add clothes" }: { onAdded: (i
       <input
         ref={input}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         multiple
         hidden
         onChange={(e) => {
